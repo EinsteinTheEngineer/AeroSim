@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroSim — 3D CAD Wind Tunnel</title>
+  
+  <link rel="stylesheet" href="./styles.css">
+  
+  <!-- Three.js Dependencies -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+</head>
+<body>
+
+  <div id="app-container">
+    <!-- Full-Screen 3D Viewport -->
+    <div id="canvas-container">
+      <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <div id="loading-text">Integrating 3D Mesh Triangles...</div>
+      </div>
+
+      <!-- Legend Overlay -->
+      <div id="viewport-overlay">
+        <div class="legend-item"><span class="dot" style="background:#ef4444;"></span> Stagnation / High Pressure</div>
+        <div class="legend-item"><span class="dot" style="background:#38bdf8;"></span> High-Speed Stream</div>
+        <div class="legend-item"><span class="dot" style="background:#10b981;"></span> Wake Vortex / Lift</div>
+        <div class="legend-item"><span class="dot" style="background:#f59e0b;"></span> Drag Vector</div>
+        <div class="legend-item"><span class="dot" style="background:#c084fc;"></span> Roll Torque (X-Axis)</div>
+      </div>
+    </div>
+
+    <!-- Floating Sleek Dark Sidebar -->
+    <div id="sidebar">
+      <div class="header">
+        <h1>AeroSim</h1>
+        <div class="status-indicator">● MESH CFD</div>
+      </div>
+
+      <!-- Geometry & CAD Import -->
+      <div class="section">
+        <label for="cad-preset">CAD Model</label>
+        <select id="cad-preset">
+          <option value="airfoil">Symmetric Airfoil Wing</option>
+          <option value="asymmetric_wing">Asymmetric Test Wing (High Roll)</option>
+          <option value="car">Aerodynamic Car</option>
+          <option value="rocket">Supersonic Rocket</option>
+          <option value="sphere">Sphere</option>
+        </select>
+
+        <div class="file-box">
+          <input type="file" id="file-input" accept=".stl,.obj" hidden>
+          <button class="btn-file" onclick="document.getElementById('file-input').click()">Import Custom .STL / .OBJ</button>
+        </div>
+
+        <!-- Extracted CAD Surface Data -->
+        <div class="cad-stats">
+          <div>Planform Area (S): <strong id="mesh-s">0.00 m²</strong></div>
+          <div>Frontal Area (A): <strong id="mesh-a">0.00 m²</strong></div>
+          <div>Triangles Analyzed: <strong id="mesh-tris">0</strong></div>
+        </div>
+      </div>
+
+      <!-- Fluid & Attitude Controls -->
+      <div class="section">
+        <div class="control">
+          <div class="lbl"><span>Flow Velocity (V / u)</span><span id="val-speed">30 m/s</span></div>
+          <input type="range" id="slider-speed" min="1" max="150" step="1" value="30">
+        </div>
+
+        <div class="control">
+          <div class="lbl"><span>Angle of Attack(&alpha;)</span><span id="val-aoa">5.0°</span></div>
+          <input type="range" id="slider-aoa" min="-15" max="25" step="0.5" value="5">
+        </div>
+
+        <div class="control">
+          <div class="lbl"><span>Bank / Roll Angle (&phi;)</span><span id="val-bank">0.0°</span></div>
+          <input type="range" id="slider-bank" min="-30" max="30" step="1" value="0">
+        </div>
+
+        <div class="control">
+          <div class="lbl"><span>Fluid Medium</span></div>
+          <select id="fluid-preset">
+            <option value="air_sea">Air (Sea Level)</option>
+            <option value="air_high">Air (High Altitude)</option>
+            <option value="water">Fresh Water</option>
+            <option value="oil">Heavy Viscous Oil</option>
+          </select>
+        </div>
+
+        <div class="control">
+          <div class="lbl"><span>Dynamic Viscosity (&mu;)</span><span id="val-viscosity">1.81e-5 Pa·s</span></div>
+          <input type="range" id="slider-viscosity" min="0.00001" max="0.0005" step="0.00001" value="0.0000181">
+        </div>
+
+        <div class="control">
+          <div class="lbl"><span>Fluid Density (&rho;)</span><span id="val-density">1.225 kg/m³</span></div>
+          <input type="range" id="slider-density" min="0.1" max="1000" step="0.1" value="1.225">
+        </div>
+      </div>
+
+      <!-- Aerodynamic Telemetry -->
+      <div class="section">
+        <div class="metrics">
+          <div class="card">
+            <div class="t">Lift Force (L)</div>
+            <div class="v" id="res-lift">0.00 N</div>
+          </div>
+          <div class="card">
+            <div class="t">Drag Force (F_d)</div>
+            <div class="v" id="res-drag">0.00 N</div>
+          </div>
+          <div class="card">
+            <div class="t">Lift Coeff (C_L)</div>
+            <div class="v" id="res-cl">0.000</div>
+          </div>
+          <div class="card">
+            <div class="t">Drag Coeff (C_d)</div>
+            <div class="v" id="res-cd">0.000</div>
+          </div>
+          <div class="card full-width">
+            <div class="t">Roll Torque & Tendency (M_x)</div>
+            <div class="v roll-val" id="res-roll">0.00 N·m (Balanced)</div>
+          </div>
+        </div>
+
+        <div class="regime" id="regime-badge">LAMINAR FLOW</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
